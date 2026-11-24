@@ -37,10 +37,13 @@ function base(f: FieldSpec): ZodTypeAny {
 
 function field(f: FieldSpec, requireIt: boolean): ZodTypeAny {
   const schema = base(f);
+  const textual = f.type === 'string' || f.type === 'text' || f.type === 'markdown';
   if (requireIt && f.required) {
     // Required strings must be non-empty.
-    return f.type === 'string' || f.type === 'text' || f.type === 'markdown' ? (schema as z.ZodString).min(1, `${f.label} is required`) : schema;
+    return textual ? (schema as z.ZodString).min(1, `${f.label} is required`) : schema;
   }
+  // On update a required text field may be left out, but if it is sent it cannot be blanked.
+  if (f.required && textual) return (schema as z.ZodString).min(1, `${f.label} is required`).optional();
   // Optional fields accept null (clearing a value) and empty strings.
   const emptyOk = f.type === 'string' || f.type === 'text' || f.type === 'markdown' ? z.union([schema, z.literal('')]) : schema;
   return emptyOk.nullable().optional();
