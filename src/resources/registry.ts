@@ -33,7 +33,7 @@ export const RESOURCES: ResourceSpec[] = [
       bool('lilBooEnabled', 'Lil Boo assistant enabled', { group: 'Lil Boo', default: true }),
       media('lilBooAvatar', 'Lil Boo avatar', { group: 'Lil Boo' }),
       text('lilBooGreeting', 'Lil Boo greeting', { group: 'Lil Boo', default: "What's good! I'm Lil Boo. Ask me what to watch, what to listen to, or what's dropping in the Vault Store." }),
-      text('lilBooDemoReply', 'Lil Boo reply (until a real AI provider is connected)', { group: 'Lil Boo', default: 'Demo mode: Lil Boo is not connected to a live assistant in this frontend build.' }),
+      text('lilBooDemoReply', 'Lil Boo reply (until a real AI provider is connected)', { group: 'Lil Boo', default: "I'm still getting set up, so I can't chat just yet — but you can browse Watch, Listen and the Vault Store anytime." }),
       bool('radioLauncherEnabled', 'Floating radio launcher enabled', { group: 'Radio launcher', default: true }),
       str('radioLauncherTarget', 'Radio launcher link', { group: 'Radio launcher', default: '/radio' }),
     ],

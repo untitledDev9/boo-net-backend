@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
 import { loadEnv, type Env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 import { adminRouter } from './routes/admin.js';
@@ -28,7 +29,8 @@ export function createApp(options: AppOptions = {}): Express {
   app.use(cookieParser());
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, storage: storage.name });
+    // ok = the process is serving requests (use this for Render's health check); db = Mongo connection state.
+    res.json({ ok: true, db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', storage: storage.name, uptime: Math.round(process.uptime()) });
   });
 
   // Development/test only: serve files held by the in-memory stub storage.
