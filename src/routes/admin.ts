@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import type { Env } from '../config/env.js';
-import { AuditLog, modelOf } from '../db/models.js';
+import { AuditLog, User, modelOf } from '../db/models.js';
 import { originGuard, requireAuth, requireRole } from '../middleware/auth.js';
+import { HttpError } from '../middleware/errors.js';
+import { signChatSocketToken } from '../realtime.js';
 import { MODULE_ORDER, RESOURCES, readRolesOf } from '../resources/registry.js';
 import type { Role } from '../resources/types.js';
 import { CHAT_ROLES } from '../services/chat.js';
@@ -9,6 +11,7 @@ import type { MediaStorage } from '../services/storage.js';
 import { adminChatRouter } from './chat.js';
 import { adminResourceRouter } from './adminResource.js';
 import { mediaRouter } from './media.js';
+import { notificationsRouter } from './notifications.js';
 import { usersRouter } from './users.js';
 
 /** Which resources/fields carry the "needs attention" state for each inbox. */
@@ -98,6 +101,15 @@ export function adminRouter(env: Env, storage: MediaStorage): Router {
     });
   });
 
+  /** A two-minute token for the live socket (the session cookie is not sent to the socket's host). Any staff role may ask. */
+  router.post('/socket-token', async (req, res) => {
+    // tokenVersion is read fresh so a password change or deactivation also cuts off sockets.
+    const user = await User.findById(req.user!.id);
+    if (!user || !user.isActive) throw new HttpError(401, 'Session is no longer valid. Please sign in again.');
+    res.json({ token: signChatSocketToken(env, String(user._id), user.tokenVersion), expiresIn: 120 });
+  });
+
+  router.use('/notifications', notificationsRouter());
   router.use('/chat', adminChatRouter(env));
   router.use('/media', mediaRouter(storage));
   router.use('/users', usersRouter());

@@ -2,6 +2,7 @@ import type { Request } from 'express';
 import type { Model } from 'mongoose';
 import { AuditLog } from '../db/models.js';
 import type { FieldSpec, ResourceSpec } from '../resources/types.js';
+import { notifyActivity } from './notify.js';
 
 export const slugify = (s: string): string =>
   s
@@ -102,6 +103,8 @@ export async function audit(req: Request, action: string, entity: string, entity
       changes,
       ip: req.ip,
     });
+    // Teammates who opted in hear about it (muted by default). Account changes have their own, louder alert.
+    if (!(entity === 'user' && action !== 'login')) notifyActivity(summary, req.user?.name, req.user?.id, entity, entityId);
   } catch {
     // Auditing must never block the action it records.
   }

@@ -19,6 +19,9 @@ const schema = z.object({
   BOOTSTRAP_TOKEN: z.string().optional(),
   ADMIN_EMAIL: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
 });
 
 export interface Env {
@@ -33,6 +36,8 @@ export interface Env {
   bootstrapToken?: string;
   adminEmail?: string;
   adminPassword?: string;
+  /** Push signing keys. Optional: when unset they are generated once and stored in the database. */
+  vapid: { publicKey: string; privateKey: string; subject?: string } | null;
 }
 
 const DEV_SECRET = 'dev-only-insecure-secret-change-me-please';
@@ -62,5 +67,6 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     bootstrapToken: parsed.BOOTSTRAP_TOKEN,
     adminEmail: parsed.ADMIN_EMAIL,
     adminPassword: parsed.ADMIN_PASSWORD,
+    vapid: parsed.VAPID_PUBLIC_KEY && parsed.VAPID_PRIVATE_KEY ? { publicKey: parsed.VAPID_PUBLIC_KEY, privateKey: parsed.VAPID_PRIVATE_KEY, subject: parsed.VAPID_SUBJECT } : null,
   };
 }

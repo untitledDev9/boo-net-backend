@@ -3,6 +3,7 @@ import type { Server } from 'socket.io';
 import { ChatMessage, ChatThread } from '../db/models.js';
 import { HttpError } from '../middleware/errors.js';
 import type { Role } from '../resources/types.js';
+import { notifyChat, resolveGroup } from './notify.js';
 
 /** Staff roles that can read and answer chats (same people who see the other inboxes). */
 export const CHAT_ROLES: Role[] = ['superadmin', 'admin', 'support'];
@@ -72,6 +73,7 @@ export async function createThread(input: { name: string; email: string; text: s
   });
   const message = await ChatMessage.create({ thread: thread._id, from: 'visitor', text: input.text });
   emitMessage(thread, message);
+  notifyChat({ id: String(thread._id), name: thread.name }, input.text, CHAT_ROLES, true);
   return { thread, message, token };
 }
 
@@ -84,6 +86,7 @@ export async function visitorSend(threadId: string, text: string) {
   );
   if (!thread) throw new HttpError(404, 'Chat not found');
   emitMessage(thread, message);
+  notifyChat({ id: String(thread._id), name: thread.name }, text, CHAT_ROLES, false);
   return { thread, message };
 }
 
@@ -98,6 +101,7 @@ export async function staffSend(threadId: string, staffName: string, text: strin
     { new: true },
   );
   emitMessage(thread, message);
+  void resolveGroup(`chat:${threadId}`); // someone answered, so the "new message" alert is done for everyone
   return { thread: thread!, message };
 }
 
@@ -105,6 +109,7 @@ export async function markReadByStaff(threadId: string) {
   const thread = await ChatThread.findByIdAndUpdate(threadId, { $set: { unreadStaff: 0 } }, { new: true });
   if (!thread) throw new HttpError(404, 'Chat not found');
   emitThread(thread);
+  void resolveGroup(`chat:${threadId}`);
   return thread;
 }
 

@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { createApp } from './app.js';
 import { loadEnv } from './config/env.js';
 import { attachRealtime } from './realtime.js';
+import { initPush } from './services/notify.js';
 
 const env = loadEnv();
 if (!env.mongodbUri) {
@@ -13,6 +14,7 @@ if (!env.mongodbUri) {
 }
 
 await mongoose.connect(env.mongodbUri);
+await initPush(env); // phone/desktop alerts (keys are created on first run)
 const app = createApp({ env });
 const server = createServer(app);
 attachRealtime(server, env); // live chat sockets share the HTTP port

@@ -71,6 +71,10 @@ export interface UserDoc {
   isActive: boolean;
   tokenVersion: number;
   lastLoginAt?: Date;
+  /** Everything in the notification feed older than this counts as read for this person. */
+  notifReadAllAt?: Date;
+  /** Notification kinds this person silenced (no phone alert, banner or sound). Unset = the defaults. */
+  notifMuted?: string[];
 }
 export const User = model<UserDoc>(
   'user',
@@ -83,6 +87,8 @@ export const User = model<UserDoc>(
       isActive: { type: Boolean, default: true },
       tokenVersion: { type: Number, default: 0 },
       lastLoginAt: Date,
+      notifReadAllAt: Date,
+      notifMuted: { type: [String], default: undefined },
     },
     { timestamps: true },
   ),
@@ -190,6 +196,79 @@ export const ChatMessage = model<ChatMessageDoc>(
     },
     { timestamps: { createdAt: 'at', updatedAt: false } },
   ),
+);
+
+// ───────── Notifications ─────────
+export interface NotificationDoc {
+  kind: string;
+  title: string;
+  body: string;
+  /** In-app path to open, e.g. /sharp/chat/<id>. */
+  url: string;
+  /** Roles that can see it. */
+  roles: string[];
+  /** Notifications with the same group collapse into one entry that keeps being updated (a chat's new messages). */
+  group?: string;
+  count: number;
+  actor?: mongoose.Types.ObjectId;
+  entity?: string;
+  entityId?: string;
+  /** Staff who opened or dismissed it. */
+  readBy: mongoose.Types.ObjectId[];
+  /** Dealt with for everybody (e.g. the chat was answered), regardless of readBy. */
+  resolved: boolean;
+  /** Creation time, moved forward whenever a grouped notification gets another event. */
+  touchedAt: Date;
+}
+const notificationSchema = new Schema(
+  {
+    kind: { type: String, required: true, index: true },
+    title: { type: String, required: true, maxlength: 200 },
+    body: { type: String, default: '', maxlength: 400 },
+    url: { type: String, default: '/sharp' },
+    roles: { type: [String], index: true },
+    group: { type: String, index: true },
+    count: { type: Number, default: 1 },
+    actor: { type: ObjectId, ref: 'user' },
+    entity: String,
+    entityId: String,
+    readBy: [{ type: ObjectId, ref: 'user' }],
+    resolved: { type: Boolean, default: false },
+    touchedAt: { type: Date, default: Date.now, index: true },
+  },
+  { timestamps: true },
+);
+notificationSchema.index({ touchedAt: 1 }, { expireAfterSeconds: 60 * 24 * 60 * 60 }); // keep 60 days
+export const Notification = model<NotificationDoc>('notification', notificationSchema);
+
+/** One browser/phone that agreed to receive push alerts (works with the site closed). */
+export interface PushSubscriptionDoc {
+  user: mongoose.Types.ObjectId;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  userAgent?: string;
+  lastSentAt?: Date;
+}
+export const PushSubscription = model<PushSubscriptionDoc>(
+  'pushSubscription',
+  new Schema(
+    {
+      user: { type: ObjectId, ref: 'user', required: true, index: true },
+      endpoint: { type: String, required: true, unique: true },
+      p256dh: { type: String, required: true },
+      auth: { type: String, required: true },
+      userAgent: { type: String, maxlength: 300 },
+      lastSentAt: Date,
+    },
+    { timestamps: true },
+  ),
+);
+
+/** The server's push (VAPID) signing keys, generated once and kept so subscriptions survive restarts. */
+export const PushKeys = model<{ key: string; publicKey?: string; privateKey?: string }>(
+  'pushKeys',
+  new Schema({ key: { type: String, default: 'vapid', unique: true }, publicKey: String, privateKey: { type: String, select: false } }, { timestamps: true }),
 );
 
 /** Content models by resource key, built from the registry. */

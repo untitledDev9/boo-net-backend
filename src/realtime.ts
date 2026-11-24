@@ -3,7 +3,9 @@ import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import type { Env } from './config/env.js';
 import { ChatThread, User } from './db/models.js';
+import type { Role } from './resources/types.js';
 import { CHAT_ROLES, isStaffOnline, setIo, tokenMatches } from './services/chat.js';
+import { setNotifyIo } from './services/notify.js';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -18,6 +20,8 @@ interface SocketData {
   kind: 'staff' | 'visitor';
   threadId?: string;
   name?: string;
+  userId?: string;
+  role?: string;
 }
 
 /**
@@ -31,6 +35,7 @@ export function attachRealtime(server: HttpServer, env: Env) {
     maxHttpBufferSize: 20_000,
   });
   setIo(io);
+  setNotifyIo(io);
 
   io.use(async (socket, next) => {
     try {
@@ -39,8 +44,8 @@ export function attachRealtime(server: HttpServer, env: Env) {
       if (auth.role === 'staff') {
         const payload = jwt.verify(token, socketSecret(env)) as { sub?: string; tv?: number };
         const user = payload.sub ? await User.findById(payload.sub) : null;
-        if (!user || !user.isActive || user.tokenVersion !== payload.tv || !CHAT_ROLES.includes(user.role)) return next(new Error('unauthorized'));
-        socket.data = { kind: 'staff', name: user.name } satisfies SocketData;
+        if (!user || !user.isActive || user.tokenVersion !== payload.tv) return next(new Error('unauthorized'));
+        socket.data = { kind: 'staff', name: user.name, userId: String(user._id), role: user.role } satisfies SocketData;
         return next();
       }
       if (auth.role === 'visitor' && typeof auth.threadId === 'string' && OBJECT_ID.test(auth.threadId)) {
@@ -60,8 +65,13 @@ export function attachRealtime(server: HttpServer, env: Env) {
   io.on('connection', (socket) => {
     const data = socket.data as SocketData;
     if (data.kind === 'staff') {
-      socket.join('staff');
-      broadcastPresence();
+      // Every staff member hears notifications for their role; only chat staff join the chat room (and count as "online" for visitors).
+      socket.join(`role:${data.role}`);
+      socket.join(`user:${data.userId}`);
+      if (CHAT_ROLES.includes(data.role as Role)) {
+        socket.join('staff');
+        broadcastPresence();
+      }
     } else {
       socket.join(`thread:${data.threadId}`);
       socket.join('visitors');
@@ -72,6 +82,7 @@ export function attachRealtime(server: HttpServer, env: Env) {
     socket.on('chat:typing', (payload: { threadId?: string; typing?: boolean } | undefined) => {
       const typing = Boolean(payload?.typing);
       if (data.kind === 'staff') {
+        if (!CHAT_ROLES.includes(data.role as Role)) return;
         const threadId = payload?.threadId;
         if (typeof threadId === 'string' && OBJECT_ID.test(threadId)) socket.to(`thread:${threadId}`).emit('chat:typing', { threadId, from: 'staff', name: data.name, typing });
       } else {
@@ -80,7 +91,7 @@ export function attachRealtime(server: HttpServer, env: Env) {
     });
 
     socket.on('disconnect', () => {
-      if (data.kind === 'staff') broadcastPresence();
+      if (data.kind === 'staff' && CHAT_ROLES.includes(data.role as Role)) broadcastPresence();
     });
   });
 

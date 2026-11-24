@@ -8,6 +8,7 @@ import { RESOURCES } from '../resources/registry.js';
 import type { ResourceSpec } from '../resources/types.js';
 import { validatorsFor } from '../resources/validators.js';
 import { publishedFilter, queryFilters, sortFor } from '../services/content.js';
+import { notifyOrder, notifySubmission } from '../services/notify.js';
 import { populateFor, serialize } from '../services/serialize.js';
 import { ensureSingleton } from './adminResource.js';
 
@@ -50,6 +51,8 @@ async function createOrder(body: z.infer<typeof orderBody>) {
   const total = lines.reduce((n, l) => n + l.price * l.qty, 0);
   const number = `BN-${Date.now().toString(36).toUpperCase()}-${randomBytes(2).toString('hex').toUpperCase()}`;
   const doc = await modelOf('order').create({ number, buyerEmail: body.buyerEmail || undefined, buyerName: body.buyerName, lines, total, orderStatus: 'pending' });
+  const orderSpec = RESOURCES.find((r) => r.key === 'order')!;
+  notifyOrder(orderSpec, { id: String(doc._id), number, total, buyerName: body.buyerName, buyerEmail: body.buyerEmail || undefined, items: lines.reduce((n, l) => n + l.qty, 0) });
   return { id: String(doc._id), number, total, status: 'pending' };
 }
 
@@ -127,6 +130,7 @@ export function publicRouter(): Router {
           }
           const data = await prepareSubmission(spec, { ...parsed, ...(spec.publicSubmit!.defaults ?? {}) });
           const doc = await Model.create(data);
+          notifySubmission(spec, doc.toObject()); // tells staff (live + phone) without delaying the visitor
           const fresh = await Model.findById(doc._id).populate(populate).lean();
           res.status(201).json(spec.publicRead ? serialize(spec, fresh!) : { ok: true });
         },
