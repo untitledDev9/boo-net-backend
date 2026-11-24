@@ -22,10 +22,10 @@ if (!check.success) fail(check.error.issues.map((i) => i.message).join('; '));
 await mongoose.connect(uri!);
 if ((await User.countDocuments()) > 0) {
   await mongoose.disconnect();
-  fail('An account already exists. Create further staff accounts from /admin/users instead.');
+  fail('An account already exists. Create further staff accounts from /sharp/users instead.');
 }
 await User.create({ email: email!, name, role: 'superadmin', passwordHash: await bcrypt.hash(password!, 12) });
-console.log(`Created superadmin ${email}. You can now sign in at /admin. Remove ADMIN_PASSWORD from your environment.`);
+console.log(`Created superadmin ${email}. You can now sign in at /sharp. Remove ADMIN_PASSWORD from your environment.`);
 await mongoose.disconnect();
 
 function fail(msg: string): never {
