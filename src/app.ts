@@ -7,6 +7,7 @@ import { loadEnv, type Env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 import { adminRouter } from './routes/admin.js';
 import { authRouter } from './routes/auth.js';
+import { publicChatRouter } from './routes/chat.js';
 import { publicRouter } from './routes/public.js';
 import { createStorage, StubStorage, type MediaStorage } from './services/storage.js';
 
@@ -46,6 +47,7 @@ export function createApp(options: AppOptions = {}): Express {
     });
   }
 
+  app.use('/api/public/chat', publicChatRouter());
   app.use('/api/public', publicRouter());
   app.use('/api/auth', authRouter(env, { loginLimit: options.loginLimit }));
   app.use('/api/admin', adminRouter(env, storage));

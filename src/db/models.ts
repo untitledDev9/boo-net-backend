@@ -142,6 +142,56 @@ export const AuditLog = model(
   ),
 );
 
+// ───────── Live chat ─────────
+export interface ChatThreadDoc {
+  name: string;
+  email: string;
+  status: 'open' | 'closed';
+  /** SHA-256 of the secret the visitor's browser holds; never returned by the API. */
+  tokenHash: string;
+  lastMessageAt: Date;
+  lastMessageText: string;
+  /** Visitor messages staff have not read yet. */
+  unreadStaff: number;
+  /** Staff replies the visitor has not read yet. */
+  unreadVisitor: number;
+}
+export const ChatThread = model<ChatThreadDoc>(
+  'chatThread',
+  new Schema(
+    {
+      name: { type: String, required: true, trim: true, maxlength: 80 },
+      email: { type: String, required: true, trim: true, lowercase: true, maxlength: 200 },
+      status: { type: String, enum: ['open', 'closed'], default: 'open', index: true },
+      tokenHash: { type: String, required: true, select: false },
+      lastMessageAt: { type: Date, default: Date.now, index: true },
+      lastMessageText: { type: String, default: '' },
+      unreadStaff: { type: Number, default: 0 },
+      unreadVisitor: { type: Number, default: 0 },
+    },
+    { timestamps: true },
+  ),
+);
+
+export interface ChatMessageDoc {
+  thread: mongoose.Types.ObjectId;
+  from: 'visitor' | 'staff';
+  staffName?: string;
+  text: string;
+}
+export const ChatMessage = model<ChatMessageDoc>(
+  'chatMessage',
+  new Schema(
+    {
+      thread: { type: ObjectId, ref: 'chatThread', required: true, index: true },
+      from: { type: String, enum: ['visitor', 'staff'], required: true },
+      staffName: String,
+      text: { type: String, required: true, maxlength: 2000 },
+    },
+    { timestamps: { createdAt: 'at', updatedAt: false } },
+  ),
+);
+
 /** Content models by resource key, built from the registry. */
 export const Models: Record<string, Model<any>> = {};
 for (const spec of RESOURCES) Models[spec.key] = model(spec.key, buildSchema(spec));

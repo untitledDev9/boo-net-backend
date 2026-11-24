@@ -4,7 +4,9 @@ import { AuditLog, modelOf } from '../db/models.js';
 import { originGuard, requireAuth, requireRole } from '../middleware/auth.js';
 import { MODULE_ORDER, RESOURCES, readRolesOf } from '../resources/registry.js';
 import type { Role } from '../resources/types.js';
+import { CHAT_ROLES } from '../services/chat.js';
 import type { MediaStorage } from '../services/storage.js';
+import { adminChatRouter } from './chat.js';
 import { adminResourceRouter } from './adminResource.js';
 import { mediaRouter } from './media.js';
 import { usersRouter } from './users.js';
@@ -48,7 +50,7 @@ export function adminRouter(env: Env, storage: MediaStorage): Router {
     res.json({
       user: req.user,
       modules,
-      tools: { media: ['superadmin', 'admin', 'editor'].includes(role), users: role === 'superadmin', audit: ['superadmin', 'admin'].includes(role), storage: storage.name },
+      tools: { media: ['superadmin', 'admin', 'editor'].includes(role), chat: CHAT_ROLES.includes(role), users: role === 'superadmin', audit: ['superadmin', 'admin'].includes(role), storage: storage.name },
     });
   });
 
@@ -96,6 +98,7 @@ export function adminRouter(env: Env, storage: MediaStorage): Router {
     });
   });
 
+  router.use('/chat', adminChatRouter(env));
   router.use('/media', mediaRouter(storage));
   router.use('/users', usersRouter());
   for (const spec of RESOURCES) router.use(`/${spec.path}`, adminResourceRouter(spec));
